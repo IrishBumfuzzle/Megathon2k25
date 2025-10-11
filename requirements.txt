@@ -3,4 +3,5 @@ opencv-python-headless
 pillow==10.4.0
 numpy==1.26.4
 geopy==2.4.1
+requests
 # tensorflow==2.15.0
