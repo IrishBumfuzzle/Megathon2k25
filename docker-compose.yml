@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # image: megathon2k25:latest
+    volumes:
+      - ./:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    # restart: unless-stopped
+    command: ["python", "main.py"]
+
+# Example GPU service (requires NVIDIA runtime and appropriate TF GPU image)
+# gpu-app:
+#   build:
+#     context: .
+#     dockerfile: Dockerfile.gpu
+#   runtime: nvidia
+#   environment:
+#     - NVIDIA_VISIBLE_DEVICES=all
+#   volumes:
+#     - ./:/app
+#   ports:
+#     - "8000:8000"
+#   command: ["python", "main.py"]
