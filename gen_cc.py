@@ -105,17 +105,9 @@ Description: "{prompt}"
 Respond ONLY with a valid JSON object with damage types as keys and estimated costs as values.
 Set cost to 0 for damage types not mentioned or not present.
 
-Cost reference ranges:
-- damaged door: ₹8,000 - ₹25,000
-- damaged window: ₹3,000 - ₹15,000
-- damaged headlight: ₹2,000 - ₹8,000
-- damaged mirror: ₹1,500 - ₹5,000
-- dent: ₹500 - ₹5,000
-- damaged hood: ₹5,000 - ₹20,000
-- damaged bumper: ₹8,000 - ₹30,000
-- damaged wind shield: ₹5,000 - ₹25,000
+Cost reference ranges should be dependent on the model of the car, search them.
 
-Output format:
+Output format: (example)
 {{
   "damaged door": 0,
   "damaged window": 0,

@@ -12,14 +12,17 @@ import matplotlib.pyplot as plt
 api_key = "AIzaSyBvUHEUIohvPADPkMZJdhcaTIFfHbRAfJU"
 genai.configure(api_key=api_key)
 
-model = YOLO("best (1).pt")
+model = YOLO("roboflow_car_damage_best.pt")
 
-possible_classes = [
-    "damaged door", "damaged window", "damaged headlight", "damaged mirror",
-    "dent", "damaged hood", "damaged bumper", "damaged wind shield"
+classNames = [
+    'Bodypanel-Dent', 'Front-Windscreen-Damage', 'Headlight-Damage',
+    'Rear-windscreen-Damage', 'RunningBoard-Dent', 'Sidemirror-Damage',
+    'Signlight-Damage', 'Taillight-Damage', 'bonnet-dent', 'boot-dent',
+    'doorouter-dent', 'fender-dent', 'front-bumper-dent', 'pillar-dent',
+    'quaterpanel-dent', 'rear-bumper-dent', 'roof-dent'
 ]
 
-output_dict = {key: 0.0 for key in possible_classes}
+output_dict = {key: 0.0 for key in classNames}
 
 def calculate_cosine_similarity(dict1, dict2):
     """
@@ -27,7 +30,6 @@ def calculate_cosine_similarity(dict1, dict2):
     Converts to binary: 1 if value > 0, else 0
     """
     all_keys = set(dict1.keys()) | set(dict2.keys())
-    # Binary vectors: 1 if damage present (value > 0), 0 otherwise
     vector_a = [1 if dict1.get(key, 0) > 0 else 0 for key in all_keys]
     vector_b = [1 if dict2.get(key, 0) > 0 else 0 for key in all_keys]
     
@@ -47,16 +49,12 @@ try:
     with open(desc_path, "r") as f:
         desc_data = json.load(f)
     
-    # Extract description - handle nested structure
     if "vehicle" in desc_data:
-        # Get the vehicle description field
         if "description" in desc_data["vehicle"]:
             prompt = desc_data["vehicle"]["description"]
-        # Also build description from condition details
         condition_parts = []
         if "condition" in desc_data["vehicle"]:
             condition = desc_data["vehicle"]["condition"]
-            # Recursively extract damage information
             def extract_damage_info(obj, prefix=""):
                 parts = []
                 if isinstance(obj, dict):
@@ -90,7 +88,7 @@ print("=" * 80)
 print()
 
 # Gemini analysis
-damage_report_cost = {key: 0 for key in possible_classes}
+damage_report_cost = {key: 0 for key in classNames}
 
 if prompt:
     prompt_template = f"""
@@ -98,33 +96,34 @@ You are an expert vehicle damage assessor. Analyze the following accident descri
 1. Identify which types of damage are present
 2. Estimate repair costs in Indian Rupees (INR)
 
-Damage types you can identify: {possible_classes}
+Damage types you can identify: {classNames}
 
 Description: "{prompt}"
 
 Respond ONLY with a valid JSON object with damage types as keys and estimated costs as values.
 Set cost to 0 for damage types not mentioned or not present.
 
-Cost reference ranges:
-- damaged door: ₹8,000 - ₹25,000
-- damaged window: ₹3,000 - ₹15,000
-- damaged headlight: ₹2,000 - ₹8,000
-- damaged mirror: ₹1,500 - ₹5,000
-- dent: ₹500 - ₹5,000
-- damaged hood: ₹5,000 - ₹20,000
-- damaged bumper: ₹8,000 - ₹30,000
-- damaged wind shield: ₹5,000 - ₹25,000
+Cost reference ranges should be dependent on the model of the car, search them.
 
-Output format:
+Output format: (example)
 {{
-  "damaged door": 0,
-  "damaged window": 0,
-  "damaged headlight": 0,
-  "damaged mirror": 0,
-  "dent": 0,
-  "damaged hood": 0,
-  "damaged bumper": 15000,
-  "damaged wind shield": 0
+  "Bodypanel-Dent": 0,
+  "Front-Windscreen-Damage": 0,
+  "Headlight-Damage": 0,
+  "Rear-windscreen-Damage": 0,
+  "RunningBoard-Dent": 0,
+  "Sidemirror-Damage": 0,
+  "Signlight-Damage": 0,
+  "Taillight-Damage": 0,
+  "bonnet-dent": 0,
+  "boot-dent": 0,
+  "doorouter-dent": 0,
+  "fender-dent": 0,
+  "front-bumper-dent": 0,
+  "pillar-dent": 0,
+  "quaterpanel-dent": 0,
+  "rear-bumper-dent": 0,
+  "roof-dent": 0
 }}
 """
 
@@ -136,7 +135,6 @@ Output format:
         )
         output_text = response.text.strip()
         
-        # Clean up response
         if "```json" in output_text:
             json_string = output_text.split("```json")[1].split("```")[0].strip()
         elif "```" in output_text:
@@ -161,24 +159,19 @@ def generate_gradcam(model, image_path, output_path):
         import cv2
         from PIL import Image
         
-        # Load image
         img = cv2.imread(image_path)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         original_h, original_w = img.shape[:2]
         
-        # Run prediction to get detections
         results = model.predict(image_path, conf=0.4, iou=0.3, verbose=False)
         
         if len(results) == 0 or results[0].boxes is None or len(results[0].boxes) == 0:
-            # No detections, save original image
             cv2.imwrite(output_path, img)
             return False
         
-        # Get the model's feature maps from a forward pass
         yolo_model = model.model
         yolo_model.eval()
         
-        # Prepare input
         img_resized = cv2.resize(img_rgb, (640, 640))
         img_tensor = torch.from_numpy(img_resized).permute(2, 0, 1).float() / 255.0
         img_tensor = img_tensor.unsqueeze(0)
@@ -187,13 +180,10 @@ def generate_gradcam(model, image_path, output_path):
             img_tensor = img_tensor.cuda()
             yolo_model = yolo_model.cuda()
         
-        # Hook to capture feature maps
         feature_maps = []
         def hook_fn(module, input, output):
             feature_maps.append(output)
         
-        # Register hook on the last convolutional layer before detection head
-        # For YOLOv8, this is typically model.model[-2] or model.model[-3]
         target_layer = None
         for i in range(len(yolo_model.model) - 1, -1, -1):
             layer = yolo_model.model[i]
@@ -202,12 +192,10 @@ def generate_gradcam(model, image_path, output_path):
                 break
         
         if target_layer is None:
-            # Fallback to a reasonable layer
             target_layer = yolo_model.model[-4] if len(yolo_model.model) > 4 else yolo_model.model[-1]
         
         handle = target_layer.register_forward_hook(hook_fn)
         
-        # Forward pass
         with torch.no_grad():
             _ = yolo_model(img_tensor)
         
@@ -217,47 +205,32 @@ def generate_gradcam(model, image_path, output_path):
             cv2.imwrite(output_path, img)
             return False
         
-        # Get feature map
         feature_map = feature_maps[0]
         if isinstance(feature_map, tuple):
             feature_map = feature_map[0]
         
-        # Average across channels to get attention map
-        if len(feature_map.shape) == 4:  # [batch, channels, height, width]
+        if len(feature_map.shape) == 4:
             attention_map = torch.mean(feature_map[0], dim=0).cpu().numpy()
         else:
             attention_map = feature_map[0].cpu().numpy()
         
-        # Normalize attention map
         attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min() + 1e-8)
-        
-        # Resize attention map to original image size
         attention_map_resized = cv2.resize(attention_map, (original_w, original_h))
-        
-        # Apply colormap
         heatmap = cv2.applyColorMap(np.uint8(255 * attention_map_resized), cv2.COLORMAP_JET)
-        
-        # Overlay heatmap on original image
         overlay = cv2.addWeighted(img, 0.6, heatmap, 0.4, 0)
         
-        # Draw bounding boxes on top
         boxes = results[0].boxes
         for box in boxes:
             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
             conf = box.conf.item()
             cls_idx = int(box.cls.item())
             cls_name = model.names[cls_idx]
-            
-            # Draw rectangle
             cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            
-            # Draw label background
             label = f"{cls_name}: {conf:.2f}"
             (label_w, label_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
             cv2.rectangle(overlay, (x1, y1 - label_h - 5), (x1 + label_w, y1), (0, 255, 0), -1)
             cv2.putText(overlay, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
         
-        # Save result
         cv2.imwrite(output_path, overlay)
         return True
         
@@ -267,7 +240,6 @@ def generate_gradcam(model, image_path, output_path):
         traceback.print_exc()
         return False
 
-# Process images with YOLO
 images_dir = os.path.join(os.path.dirname(__file__), "images")
 grade_cam_dir = os.path.join(os.path.dirname(__file__), "grade_cam")
 os.makedirs(grade_cam_dir, exist_ok=True)
@@ -280,12 +252,9 @@ for img_file in sorted(os.listdir(images_dir)):
         
     img_path = os.path.join(images_dir, img_file)
     results = model.predict(img_path, conf=0.4, iou=0.3, verbose=False)
-    
-    # Parse JSON string properly
     res_json = results[0].to_json()
     res = json.loads(res_json)
     
-    # Extract predictions
     if isinstance(res, list):
         predictions = res
     elif isinstance(res, dict) and 'predictions' in res:
@@ -293,7 +262,6 @@ for img_file in sorted(os.listdir(images_dir)):
     else:
         predictions = []
     
-    # Update output_dict with max confidence
     for prediction in predictions:
         class_name = prediction.get('name') or prediction.get('class')
         confidence = prediction.get('confidence')
@@ -302,20 +270,17 @@ for img_file in sorted(os.listdir(images_dir)):
             output_dict[class_name] = max(output_dict[class_name], confidence)
             print(f"  {img_file}: {class_name} (confidence: {confidence:.4f})")
     
-    # Generate Grad-CAM heatmap
     gradcam_path = os.path.join(grade_cam_dir, f"gradcam_{img_file}")
     generate_gradcam(model, img_path, gradcam_path)
 
 print("=" * 80)
 print()
-
 print("FINAL YOLO DETECTION CONFIDENCES:")
 print("=" * 80)
 print(json.dumps(output_dict, indent=2))
 print("=" * 80)
 print()
 
-# Calculate metrics
 print("COMPARISON RESULTS:")
 print("=" * 80)
 
@@ -333,7 +298,6 @@ else:
 
 print("=" * 80)
 
-# Save pair as JSON in /cc/cost-conf.json
 cc_dir = os.path.join(os.path.dirname(__file__), "cc")
 os.makedirs(cc_dir, exist_ok=True)
 pair_path = os.path.join(cc_dir, "cost-conf.json")

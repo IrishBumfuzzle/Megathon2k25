@@ -1,0 +1,26 @@
+{
+  "vehicle": {
+    "type": "car",
+    "description": "A car with front-end collision damage including a damaged hood with dents, cracked windshield, and damaged front bumper.",
+    "model": "Alto i10",
+    "condition": {
+      "exterior": {
+        "bumper": {
+          "status": "damaged",
+          "location": "front",
+          "severity": "moderate"
+        },
+        "hood": {
+          "status": "damaged",
+          "location": "front",
+          "severity": "moderate"
+        },
+        "windshield": {
+          "status": "cracked",
+          "location": "front",
+          "severity": "moderate"
+        }
+      }
+    }
+  }
+}
