@@ -1,6 +1,7 @@
 import requests
 import json
 
+# peyifi8162@fanlvr.com, peyifi8162@fanlvr.coM
 params = {
   'models': 'genai',
   'api_user': '1014340941',
